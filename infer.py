@@ -4,7 +4,6 @@ import boto3
 import exifread
 import torch
 import tempfile
-import shutil
 from pathlib import Path
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

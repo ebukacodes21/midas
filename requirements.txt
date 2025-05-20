@@ -1,5 +1,6 @@
 torch
 torchvision
+timm                   
 opencv-python-headless
 boto3
 exifread
