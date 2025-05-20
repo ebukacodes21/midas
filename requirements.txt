@@ -1,0 +1,4 @@
+torch
+opencv-python-headless
+boto3
+exifread
