@@ -1,44 +1,32 @@
-# ============================
-# Stage 1 — Builder
-# ============================
-FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04 as builder
-
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Install required system libraries
-RUN apt-get update && apt-get install -y \
-    python3 python3-pip git libgl1 libglib2.0-0 && \
-    rm -rf /var/lib/apt/lists/*
+# -------- Build stage --------
+FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime as builder
 
 WORKDIR /app
 
-# Copy and install Python dependencies
-COPY requirements.txt .
-RUN python3 -m pip install --no-cache-dir -r requirements.txt
+# Install system deps
+RUN apt-get update && apt-get install -y libgl1-mesa-glx libglib2.0-0 && rm -rf /var/lib/apt/lists/*
 
-# Preload MiDaS model
+# Install python deps
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Preload MiDaS model and cache torch hub
 RUN python3 -c "import torch; torch.hub.load('intel-isl/MiDaS', 'DPT_Large', trust_repo=True)"
 
-# ============================
-# Stage 2 — Final Runtime
-# ============================
-FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
-
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get update && apt-get install -y \
-    python3 python3-pip libgl1 libglib2.0-0 && \
-    rm -rf /var/lib/apt/lists/*
+# -------- Final stage --------
+FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
 
 WORKDIR /app
 
-# Copy dependencies from builder
-COPY --from=builder /usr/local/lib/python3.10 /usr/local/lib/python3.10
+# Copy installed python packages from builder stage (cache deps)
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
-COPY --from=builder /root/.cache /root/.cache 
 
-# Copy your source code
+# Copy torch hub cache for MiDaS (so no runtime download)
+COPY --from=builder /root/.cache/torch /root/.cache/torch
+
+# Copy your app code
 COPY infer.py .
+COPY requirements.txt .
 
-# Set command
 CMD ["python3", "infer.py"]
